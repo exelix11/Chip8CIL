@@ -13,13 +13,13 @@ The benchmark consists of running 5000 timess a 470 bytes test ROM for developin
 RELEASE:
 00:00:01.4460532 interperter with debug options
 00:00:01.2926303 Interperter
-00:00:00.0326472 JIT
+00:00:00.0326472 Recompilation
 00:00:00.054255  C interperter (manually formatted)
 
 DEBUG:
 00:00:02.2029128 interperter with debug options
 00:00:01.8452143 Interperter
-00:00:00.1679940 JIT
+00:00:00.1679940 Recompilation
 00:00:00.177473  C interperter (manually formatted)
 ```
 In the best case the dynarec engine is ~100 times faster than the C# interpreter and slightly better than the C interperter, really an interesting result.
