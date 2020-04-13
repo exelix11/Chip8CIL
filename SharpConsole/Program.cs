@@ -141,7 +141,7 @@ namespace SharpConsole
 				}
 
 				for (int i = 0; i < 16; i++)
-					console.Write($"V{i.ToString("X")}: {inr.State.Register((byte)i).ToString("X2")}   | ", inr.State.Registers.Span[i] != OldRegisters[i] ? ConsoleColor.Red : ConsoleColor.White);
+					console.Write($"V{i.ToString("X")}: {inr.State.Register((byte)i).ToString("X2")}   | ", inr.State.Registers.AsSpan()[i] != OldRegisters[i] ? ConsoleColor.Red : ConsoleColor.White);
 				console.Write($"I: {inr.State.I.ToString("X4")}   |", inr.State.I != OldI ? ConsoleColor.Red : ConsoleColor.White);
 				console.Write($"PC: {inr.State.PC.ToString("X4")}   |");
 				console.Write($"SP: {inr.State.SP.ToString("X4")}   |");
@@ -150,7 +150,7 @@ namespace SharpConsole
 
 				console.WriteLine("");
 				
-				OldRegisters = inr.State.Registers.ToArray();
+				OldRegisters = inr.State.Registers.AsSpan().ToArray();
 				OldI = inr.State.I;
 
 				console.Write("Space: ", ConsoleColor.Cyan);

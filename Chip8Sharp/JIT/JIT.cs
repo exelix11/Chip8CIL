@@ -11,35 +11,13 @@ namespace Chip8Sharp.JIT
 {
 	class JITContext 
 	{
-		public readonly MethodInfo GetRegister;
-
 		public readonly PropertyInfo RegisterI;
 		public readonly PropertyInfo RegisterDT;
 		public readonly PropertyInfo RegisterST;
 
-		public readonly PropertyInfo[] Registers = new PropertyInfo[0x10];
-
 		public JITContext()
 		{
 			var t = typeof(Chip8State);
-			GetRegister = t.GetMethod(nameof(Chip8State.Register));
-
-			Registers[0] = t.GetProperty(nameof(Chip8State.V0));
-			Registers[1] = t.GetProperty(nameof(Chip8State.V1));
-			Registers[2] = t.GetProperty(nameof(Chip8State.V2));
-			Registers[3] = t.GetProperty(nameof(Chip8State.V3));
-			Registers[4] = t.GetProperty(nameof(Chip8State.V4));
-			Registers[5] = t.GetProperty(nameof(Chip8State.V5));
-			Registers[6] = t.GetProperty(nameof(Chip8State.V6));
-			Registers[7] = t.GetProperty(nameof(Chip8State.V7));
-			Registers[8] = t.GetProperty(nameof(Chip8State.V8));
-			Registers[9] = t.GetProperty(nameof(Chip8State.V9));
-			Registers[0xA] = t.GetProperty(nameof(Chip8State.VA));
-			Registers[0xB] = t.GetProperty(nameof(Chip8State.VB));
-			Registers[0xC] = t.GetProperty(nameof(Chip8State.VC));
-			Registers[0xD] = t.GetProperty(nameof(Chip8State.VD));
-			Registers[0xE] = t.GetProperty(nameof(Chip8State.VE));
-			Registers[0xF] = t.GetProperty(nameof(Chip8State.VF));
 
 			RegisterI = t.GetProperty(nameof(Chip8State.I));
 			RegisterDT = t.GetProperty(nameof(Chip8State.DT));
@@ -64,7 +42,7 @@ namespace Chip8Sharp.JIT
 
 	public class JIT
 	{
-		public delegate void JITROMDelegate(Chip8State state);
+		public delegate void JITROMDelegate(Chip8State state, ref Registers registers);
 		internal delegate void EmitterFunction(JITContext info, Disassembler.DecompEntry inst, ILGenerator gen);
 
 		Disassembler disasm = new Disassembler();
@@ -81,22 +59,14 @@ namespace Chip8Sharp.JIT
 
 		private (DynamicMethod, ILGenerator) CreateMethod(string name, JITContext ctx)
 		{
-			DynamicMethod res = new DynamicMethod(name, typeof(void), new Type[] { typeof(Chip8State) });
-			var gen = res.GetILGenerator();
-
-			//Local 0 to F contains the address to the register values
-			for (int i = 0; i < 0x10; i++)
+			DynamicMethod res = (DynamicMethod)(object)new DynamicMethod(name, typeof(void), new[]
 			{
-				gen.DeclareLocal(typeof(byte).MakeByRefType());
-				gen.Emit(OpCodes.Ldarg_0);
-				gen.Emit(OpCodes.Ldc_I4_S, (byte)i);
-				gen.Emit(OpCodes.Call, ctx.GetRegister);
-				gen.Emit(OpCodes.Stloc_S, (byte)i);
-			}
+				typeof(Chip8State),
+				typeof(Registers).MakeByRefType()
+			});
 
-			//local 0x10 is a temp storage for certain instructions 
+			ILGenerator gen = res.GetILGenerator();
 			gen.DeclareLocal(typeof(int));
-
 			return (res, gen);
 		}
 

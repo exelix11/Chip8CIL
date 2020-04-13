@@ -2,35 +2,49 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Reflection;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Chip8Sharp
 {
+	[StructLayout(LayoutKind.Sequential)]
+	public struct Registers
+	{
+		public byte V0;
+		public byte V1;
+		public byte V2;
+		public byte V3;
+		public byte V4;
+		public byte V5;
+		public byte V6;
+		public byte V7;
+		public byte V8;
+		public byte V9;
+		public byte VA;
+		public byte VB;
+		public byte VC;
+		public byte VD;
+		public byte VE;
+		public byte VF;
+
+		public static readonly FieldInfo[] Fields = typeof(Registers).GetFields();
+
+		public Span<byte> AsSpan()
+		{
+			Span<Registers> valSpan = MemoryMarshal.CreateSpan(ref this, 1);
+			return MemoryMarshal.Cast<Registers, byte>(valSpan);
+		}
+	}
+
 	public class Chip8State
 	{
 		public bool Terminated = false;
+		public Registers Registers = default;
 
 		//General purpose registers
-		public Memory<byte> Registers = new byte[0x10];
-		
-		public byte V0 { get => Registers.Span[0]	; set => Registers.Span[0]	= value; }
-		public byte V1 { get => Registers.Span[1]	; set => Registers.Span[1]	= value; }
-		public byte V2 { get => Registers.Span[2]	; set => Registers.Span[2]	= value; }
-		public byte V3 { get => Registers.Span[3]	; set => Registers.Span[3]	= value; }
-		public byte V4 { get => Registers.Span[4]	; set => Registers.Span[4]	= value; }
-		public byte V5 { get => Registers.Span[5]	; set => Registers.Span[5]	= value; }
-		public byte V6 { get => Registers.Span[6]	; set => Registers.Span[6]	= value; }
-		public byte V7 { get => Registers.Span[7]	; set => Registers.Span[7]	= value; }
-		public byte V8 { get => Registers.Span[8]	; set => Registers.Span[8]	= value; }
-		public byte V9 { get => Registers.Span[9]	; set => Registers.Span[9]	= value; }
-		public byte VA { get => Registers.Span[0xA]	; set => Registers.Span[0xA]	= value; }
-		public byte VB { get => Registers.Span[0xB]	; set => Registers.Span[0xB]	= value; }
-		public byte VC { get => Registers.Span[0xC]	; set => Registers.Span[0xC]	= value; }
-		public byte VD { get => Registers.Span[0xD]	; set => Registers.Span[0xD]	= value; }
-		public byte VE { get => Registers.Span[0xE]	; set => Registers.Span[0xE]	= value; }
-		public byte VF { get => Registers.Span[0xF]	; set => Registers.Span[0xF]	= value; }
+
 
 		public UInt16 I { get; set; }
 
@@ -85,7 +99,7 @@ namespace Chip8Sharp
 			IR = 0;
 			SP = 0;
 
-			Registers.Span.Fill(0);
+			Registers.AsSpan().Fill(0);
 			VMEM.Span.Fill(0);
 			RAM.Span.Fill(0);
 			VMEMUpdated = true;
@@ -118,7 +132,7 @@ namespace Chip8Sharp
 		}
 
 		[MethodImpl(MethodImplOptions.AggressiveInlining)]
-		public ref byte Register(byte id) => ref Registers.Span[id];
+		public ref byte Register(byte id) => ref Registers.AsSpan()[id];
 
 		public UInt16 ReadInstruction()
 		{
@@ -331,7 +345,7 @@ namespace Chip8Sharp
 			if (instructions != uint.MaxValue)
 				throw new Exception("Stepping is not supported with JIT compiler");
 
-			compiledFunction(State);
+			compiledFunction(State, ref State.Registers);
 		}
 	
 		public bool IsDebuggingSupported => false;
