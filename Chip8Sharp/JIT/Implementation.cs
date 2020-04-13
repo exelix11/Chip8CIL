@@ -16,7 +16,8 @@ namespace Chip8Sharp.JIT
 		/// </summary>
 		internal static void EmitGetRegister(this ILGenerator gen, int N, JITContext ctx)
 		{
-			gen.Emit(OpCodes.Ldloc, (short)N);
+			gen.Emit(OpCodes.Ldarg_1);
+			gen.Emit(OpCodes.Ldflda, Registers.Fields[N]);
 		}
 
 		internal static void EmitLoadImmediate(this ILGenerator gen, Disassembler.DecompEntry inst) =>
@@ -81,6 +82,7 @@ namespace Chip8Sharp.JIT
 		public static void CALL(JITContext ctx, Disassembler.DecompEntry inst, ILGenerator gen)
 		{
 			gen.Emit(OpCodes.Ldarg_0);
+			gen.Emit(OpCodes.Ldarg_1);
 			gen.Emit(OpCodes.Call, ctx.Functions[inst.Value.Immediate16].Method);
 		}
 
@@ -251,14 +253,14 @@ namespace Chip8Sharp.JIT
 			gen.Emit(OpCodes.Ldind_U1); //Load value
 
 			gen.Emit(OpCodes.Dup); //duplicate value for VF comparison
-			gen.Emit(OpCodes.Stloc_S, (byte)0x10); //Store for VF comparison
+			gen.Emit(OpCodes.Stloc_0); //Store for VF comparison
 
 			gen.Emit(OpCodes.Ldc_I4_1);
 			gen.Emit(OpCodes.Shr_Un); //Shift and store
 			gen.Emit(OpCodes.Stind_I1);
 
 			gen.EmitGetRegister(0xF, ctx);
-			gen.Emit(OpCodes.Ldloc, (short)0x10);
+			gen.Emit(OpCodes.Ldloc_0);
 			gen.Emit(OpCodes.Ldc_I4_1);
 			gen.Emit(OpCodes.And);
 			gen.Emit(OpCodes.Stind_I1);
@@ -275,13 +277,13 @@ namespace Chip8Sharp.JIT
 			gen.Emit(OpCodes.Ldind_U1); //Load value
 
 			gen.Emit(OpCodes.Dup); //duplicate value for VF comparison
-			gen.Emit(OpCodes.Stloc_S, (byte)0x10); //Store for VF comparison
+			gen.Emit(OpCodes.Stloc_0); //Store for VF comparison
 
 			gen.Emit(OpCodes.Ldc_I4_1);
 			gen.Emit(OpCodes.Shl); //Shift and store
 			gen.Emit(OpCodes.Stind_I1);
 
-			gen.Emit(OpCodes.Ldloc, (short)0x10);
+			gen.Emit(OpCodes.Ldloc_0);
 			gen.Emit(OpCodes.Ldc_I4, 0x80);
 			gen.Emit(OpCodes.And);
 			gen.Emit(OpCodes.Ldc_I4_0);

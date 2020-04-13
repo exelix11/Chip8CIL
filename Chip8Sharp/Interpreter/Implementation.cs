@@ -204,7 +204,7 @@ namespace Chip8Sharp.Interpreter
 		[InstrImpl(Instruction.ADD)]
 		public static void ADD(Chip8State state, ref byte regx, ref byte regy)
 		{
-			state.VF = (byte)(regx + regy > 0xFF ? 1 : 0);
+			state.Registers.VF = (byte)(regx + regy > 0xFF ? 1 : 0);
 
 			unchecked { regx += regy; }
 		}
@@ -212,7 +212,7 @@ namespace Chip8Sharp.Interpreter
 		[InstrImpl(Instruction.SUB)]
 		public static void SUB(Chip8State state, ref byte regx, ref byte regy)
 		{
-			state.VF = (byte)(regx > regy ? 1 : 0);
+			state.Registers.VF = (byte)(regx > regy ? 1 : 0);
 
 			unchecked { regx -= regy; }
 		}
@@ -220,21 +220,21 @@ namespace Chip8Sharp.Interpreter
 		[InstrImpl(Instruction.SHR)]
 		public static void SHR(Chip8State state, ref byte regx, ref byte regy)
 		{
-			state.VF = (byte)(regx & 1);
+			state.Registers.VF = (byte)(regx & 1);
 			regx >>= 1;
 		}
 
 		[InstrImpl(Instruction.SHL)]
 		public static void SHL(Chip8State state, ref byte regx, ref byte regy)
 		{
-			state.VF = (byte)((regx & 0x80) != 0 ? 1 : 0);
+			state.Registers.VF = (byte)((regx & 0x80) != 0 ? 1 : 0);
 			regx <<= 1;
 		}
 
 		[InstrImpl(Instruction.SUBN)]
 		public static void SUBN(Chip8State state, ref byte regx, ref byte regy)
 		{
-			state.VF = (byte)(regx < regy ? 1 : 0);
+			state.Registers.VF = (byte)(regx < regy ? 1 : 0);
 
 			unchecked { regx = (byte)(regy - regx); }
 		}
@@ -248,7 +248,7 @@ namespace Chip8Sharp.Interpreter
 		[InstrImpl(Instruction.JMP0)]
 		public static void JMP0(Chip8State state, UInt16 imm)
 		{
-			state.Jump((UInt16)(state.V0 + imm));
+			state.Jump((UInt16)(state.Registers.V0 + imm));
 		}
 
 		private static Random rnd = new Random();
@@ -258,11 +258,12 @@ namespace Chip8Sharp.Interpreter
 			regx = (byte)(rnd.Next(0, 256) & imm);
 		}
 
+		private const int _dwblock = Chip8State.DisplayW / 8;
 		[InstrImpl(Instruction.DRW)]
 		public static void DRW(Chip8State state, ref byte regx, ref byte regy, byte imm4)
 		{
 			Span<byte> sprite = state.RAM.Span.Slice(state.I, imm4);
-			var vmem = state.VMEM.Span;
+			Span<byte> vmem = state.VMEM.Span;
 
 			//Precaulculate X pixels masks
 			Span<int> Offsets = stackalloc int[8];
@@ -276,38 +277,39 @@ namespace Chip8Sharp.Interpreter
 			Masks[0] = (byte)(0x80 >> (x % 8));
 			for (int i = 1; i < 8; i++)
 			{
-				Masks[i] = (byte)(Masks[i - 1] >> 1);
+				byte mask = (byte)(Masks[i - 1] >> 1);
+				Masks[i] = mask;
 				Offsets[i] = Offsets[i - 1];
-				if (Masks[i] == 0) 
+				if (mask == 0)
 				{
 					Masks[i] = 0x80;
 					Offsets[i]++;
 				}
-			}			
-			
-			state.VF = 0;
+			}
+
+			state.Registers.VF = 0;
 			int sprIndex = 0;
 			for (int y = regy; y < regy + imm4; y++)
 			{
-				var actualY = y >= Chip8State.DisplayH ? y - Chip8State.DisplayH : y;
-				var sprSrc = sprite[sprIndex++];			
-
-				int YOffset = Chip8State.DisplayW / 8 * actualY;
+				int actualY = (y >= Chip8State.DisplayH) ? (y - Chip8State.DisplayH) : y;
+				byte sprSrc = sprite[sprIndex++];
+				int YOffset = _dwblock * actualY;
 
 				for (int xs = 0; xs < 8; xs++)
 				{
-					//Source mask for sprite
-					if ((sprSrc & (0x80 >> xs)) == 0) continue;
-					//Pixel mask is different cause it can be unaligned
-					if ((vmem[YOffset + Offsets[xs]] & Masks[xs]) != 0)
+					if ((sprSrc & (128 >> xs)) != 0)
 					{
-						state.VF = 1;
-						vmem[YOffset + Offsets[xs]] &= (byte)(~Masks[xs]);
+						ref byte vmo = ref vmem[YOffset + Offsets[xs]];
+						ref byte mask = ref Masks[xs];
+						if ((vmo & mask) != 0)
+						{
+							state.Registers.VF = 1;
+							vmo &= (byte)(~mask);
+						}
+						else vmo |= mask;
 					}
-					else vmem[YOffset + Offsets[xs]] |= Masks[xs];
 				}
 			}
-
 			state.VMEMUpdated = true;
 		}
 
@@ -380,13 +382,13 @@ namespace Chip8Sharp.Interpreter
 		[InstrImpl(Instruction.STREG)]
 		public static void STREG(Chip8State state, byte regx)
 		{
-			state.Registers.Slice(0, regx + 1).CopyTo(state.RAM.Slice(state.I));
+			state.Registers.AsSpan().Slice(0, regx + 1).CopyTo(state.RAM.Span.Slice(state.I));
 		}
 
 		[InstrImpl(Instruction.LDREG)]
 		public static void LDREG(Chip8State state, byte regx)
 		{
-			state.RAM.Slice(state.I, regx + 1).CopyTo(state.Registers);
+			state.RAM.Span.Slice(state.I, regx + 1).CopyTo(state.Registers.AsSpan());
 		}
 	}
 }
