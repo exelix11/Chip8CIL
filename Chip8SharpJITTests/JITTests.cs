@@ -13,7 +13,7 @@ namespace Chip8SharpJITTests
 				state = new Chip8State();
 
 			ROM.CopyTo(state.ProgramRegion.Span);
-			new Chip8Sharp.JIT.JIT().JITROM(ROM)(state);
+			new Chip8Sharp.JIT.JIT().JITROM(ROM)(state, ref state.Registers);
 			return state;
 		}
 	}
@@ -375,7 +375,7 @@ namespace Chip8SharpJITTests
 		{
 			byte[] ROM = new byte[] { 0xC0, 0x7F };
 			var state = Helper.JITAndExecuteROM(ROM);
-			Assert.IsTrue((state.V0 & 0x80) == 0);
+			Assert.IsTrue((state.Registers.V0 & 0x80) == 0);
 			state.AssertRegsZeroExcept(0);
 		}
 
@@ -585,7 +585,7 @@ namespace Chip8SharpJITTests
 
 		public static Chip8State AssertRegsZeroExcept(this Chip8State state, params int[] values)
 		{
-			var regs = state.Registers.Span;
+			var regs = state.Registers.AsSpan();
 			for (int i = 0; i < regs.Length; i++)
 				if (!values.Contains(i))	
 					Assert.AreEqual(0, regs[i]);
