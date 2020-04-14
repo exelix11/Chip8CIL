@@ -1,0 +1,29 @@
+name: Auto benchmark
+
+# Controls when the action will run. Triggers the workflow on push or pull request
+on: [push, pull_request]
+
+# A workflow run is made up of one or more jobs that can run sequentially or in parallel
+jobs:
+  run_benchmark:
+    runs-on: ubuntu-latest
+    
+    steps:
+    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+    - uses: actions/checkout@v2
+
+    - name: Setup .NET Core
+      uses: actions/setup-dotnet@v1
+      with:
+        dotnet-version: 3.1.101
+
+    - name: JIT Unit tests
+      run : dotnet test Chip8SharpJITTests/Chip8SharpJITTests.csproj
+      env : 
+        DOTNET_SKIP_FIRST_TIME_EXPERIENCE : 1 
+
+    - name: Run benchmark
+      run: |        
+        cd .script
+        chmod +x benchmark.sh
+        ./benchmark.sh
