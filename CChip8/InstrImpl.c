@@ -9,8 +9,8 @@
 #define REGX state->Registers[inst->regx]
 #define REGY state->Registers[inst->regy]
 #define IMM16 inst->Immediate16
-#define IMM8 (uint8_t)(inst->Immediate16 & 0x00FF)
-#define IMM4 (uint8_t)(inst->Immediate16 & 0x000F)
+#define IMM8 ((uint8_t)(inst->Immediate16 & 0x00FF))
+#define IMM4 ((uint8_t)(inst->Immediate16 & 0x000F))
 
 #define VF Registers[0xF]
 
@@ -150,54 +150,48 @@ void RND(Chip8State* state, Chip8Instruction* inst)
 void DRW(Chip8State* state, Chip8Instruction* inst)
 {
 	assert(state->I + REGY + IMM4 < TotalRAM);
+
 	uint8_t* sprite = state->RAM + state->I;
 	uint8_t* vmem = state->VRAM;
 
-	//Precaulculate X pixels masks
-	int Offsets[8];
-	uint8_t Masks[8];
-
-	int x = REGX;
-	if (x + 8 >= DisplayW)
-		x = 0;
-
-	Offsets[0] = x / 8;
-	Masks[0] = (0x80 >> (x % 8));
-	for (int i = 1; i < 8; i++)
-	{
-		Masks[i] = (Masks[i - 1] >> 1);
-		Offsets[i] = Offsets[i - 1];
-		if (Masks[i] == 0)
-		{
-			Masks[i] = 0x80;
-			Offsets[i]++;
-		}
-	}
-
 	state->VF = 0;
-	int sprIndex = 0;
-	for (int y = REGY; y < REGY + IMM4; y++)
+
+	bool unset = false;
+	
+	for (int i = 0; i < IMM4; i++)
 	{
-		int actualY = y >= DisplayH ? y - DisplayH : y;
-		int sprSrc = sprite[sprIndex++];
+		uint8_t sprSrc = sprite[i];
 
-		int YOffset = DisplayW / 8 * actualY;
+		int y = REGY + i;
+		int actualY = (y >= DisplayH) ? (y - DisplayH) : y;
+		int offset = REGX + actualY * DisplayW;
 
-		for (int xs = 0; xs < 8; xs++)
+		int byteoffset = offset / 8;
+		int bitoffset = offset % 8;
+
+		uint8_t* block0 = vmem + byteoffset;
+		uint8_t* block1 = vmem + byteoffset + 1;
+
+		uint8_t newblock0 = *block0 ^ (sprSrc >> bitoffset);
+		uint8_t newblock1 = *block1 ^ (sprSrc << (8 - bitoffset));
+
+		if (!unset)
 		{
-			//Source mask for sprite
-			if ((sprSrc & (0x80 >> xs)) == 0) continue;
-			//Pixel mask is different cause it can be unaligned
-			if ((vmem[YOffset + Offsets[xs]] & Masks[xs]) != 0)
+			if ((*block0 ^ (*block0 & newblock0)) != 0 ||
+				(*block1 ^ (*block1 & newblock1)) != 0)
 			{
-				state->VF = 1;
-				vmem[YOffset + Offsets[xs]] &= (~Masks[xs]);
+				unset = true;
 			}
-			else vmem[YOffset + Offsets[xs]] |= Masks[xs];
 		}
-	}
 
-	state->VmemUpdated = true;
+		*block0 = newblock0;
+		*block1 = newblock1;
+	}
+	
+	if (unset)
+		state->VF = 1;
+
+	state->VmemUpdated = true;	
 }
 
 void SKP(Chip8State* state, Chip8Instruction* inst)
