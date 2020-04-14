@@ -3,10 +3,11 @@ using System.IO;
 using System.Text;
 using System.Linq;
 using ConsoleGame;
-using DIsplayApp;
 using Chip8Sharp;
 using System.Diagnostics;
 using Chip8Sharp.Instructions;
+using System.Threading.Tasks;
+using System.Runtime.InteropServices;
 
 namespace SharpConsole
 {
@@ -46,17 +47,42 @@ namespace SharpConsole
 			}
 		}
 
-		static void TestJIT() 
+		class VmemVisualizer
 		{
-			var (task, form) = DIsplayApp.Program.Launch(new System.Drawing.Bitmap(Chip8State.DisplayW, Chip8State.DisplayH));
+			#if WINDOWS
+				Task t = null;
+				dynamic Form = null; 
+			#endif
+			
+			public VmemVisualizer()
+			{
+				#if WINDOWS
+					(t, Form) = DIsplayApp.Program.Launch(new System.Drawing.Bitmap(Chip8State.DisplayW, Chip8State.DisplayH));
+				#else
+					
+				#endif
+			}
 
+			public void Draw(Chip8VM vm)
+			{
+				#if WINDOWS
+					Form.InvokeDraw(vm.State.VMEM);
+				#else
+					
+				#endif
+			}
+		}
+
+		static void RunJIT(string fileName) 
+		{
+			VmemVisualizer view = new VmemVisualizer();
 			Chip8VM vm = new Chip8Sharp.Chip8JIT();
-			var ROM = File.ReadAllBytes("F:/test_opcode.ch8");
+			var ROM = File.ReadAllBytes(fileName);
 			vm.LoadBinary(ROM);
 
 			vm.Run();
 
-			form.InvokeDraw(vm.State.VMEM);
+			view.Draw(vm);
 			Console.ReadLine();
 		}
 
@@ -67,38 +93,54 @@ namespace SharpConsole
 			{
 				var a = new Chip8InterpreterDBG();
 				a.LoadBinary(ROM);
-				Benchmark.Run("DBG interperter", 5000, () => { a.Run(); a.Reset(); });
+				Benchmark.Run("C# DBG interperter", 5000, () => { a.Run(); a.Reset(); });
 			}
 
 			{
 				var a = new Chip8Interpreter();
 				a.LoadBinary(ROM);
-				Benchmark.Run("Interperter", 5000, () => { a.Run(); a.Reset(); });
+				Benchmark.Run("C# Interperter", 5000, () => { a.Run(); a.Reset(); });
 			}
 
 			{
 				var a = new Chip8JIT();
 				a.LoadBinary(ROM);
-				Benchmark.Run("JIT", 5000, () => { a.Run(); a.Reset(); });
+				Benchmark.Run("C# JIT", 5000, () => { a.Run(); a.Reset(); });
 			}
-
-			Console.ReadLine();
 		}
 
 		[STAThread]
 		static void Main(string[] args)
 		{
-			//TimeVms("F:/test_opcode.ch8");
-			//return;
+			if (args.Length != 2)
+			{
+				Console.WriteLine(
+					"Usage: \r\n" +
+					"SharpConsole run <rom file> : run the rom file with the interpreter and debugger\r\n" +
+					"SharpConsole jit <rom file> : run the rom file with the recomplier (no debugger)\r\n" +
+					"SharpConsole time <rom file> : run the benchmarks on the given rom");
+				return;
+			}
 
+			if (args[0] == "jit")
+				RunJIT(args[1]);
+			else if (args[0] == "run")
+				RunInterpreter(args[1]);
+			else if (args[0] == "time")
+				TimeVms(args[1]);
+			else Console.WriteLine("Unknown mode");
+		}
+
+		static void RunInterpreter(string romName)
+		{
 			ConsoleBuffer console = new ConsoleBuffer();
-			var (task, form) = DIsplayApp.Program.Launch(new System.Drawing.Bitmap(Chip8State.DisplayW, Chip8State.DisplayH));
+			VmemVisualizer view = new VmemVisualizer();
 
 			Chip8VM inr = new Chip8Sharp.Chip8InterpreterDBG();
-			var ROM = File.ReadAllBytes("F:/test_opcode.ch8");
+			var ROM = File.ReadAllBytes(romName);
 			inr.LoadBinary(ROM);
 
-			DisassemblyProvider disasm = new DisassemblyProvider(ROM, inr.State);		
+			DisassemblyProvider disasm = new DisassemblyProvider(ROM, inr.State);
 
 			//inr.AddBreakPoint(0x268);
 
@@ -119,7 +161,7 @@ namespace SharpConsole
 						console.Write(offset.ToString("X4") + " | ", ConsoleColor.Red);
 					else
 						console.Write(offset.ToString("X4") + " | ", ConsoleColor.Gray);
-								
+
 					if (disasm.IsLabel(offset))
 						console.Write("off_" + offset.ToString("X4") + ":  ", ConsoleColor.Yellow);
 
@@ -149,7 +191,7 @@ namespace SharpConsole
 				console.Write($"ST: {inr.State.ST.ToString("X2")}   |");
 
 				console.WriteLine("");
-				
+
 				OldRegisters = inr.State.Registers.AsSpan().ToArray();
 				OldI = inr.State.I;
 
@@ -176,9 +218,9 @@ namespace SharpConsole
 
 				console.Display();
 				if (inr.CheckVMEMUpdate())
-					form.InvokeDraw(inr.State.VMEM);
+					view.Draw(inr);
 
-ReadAgain:
+				ReadAgain:
 				switch (Console.ReadKey(true).Key)
 				{
 					case ConsoleKey.P:
@@ -220,7 +262,7 @@ ReadAgain:
 						continue;
 					default:
 						goto ReadAgain;
-				}							
+				}
 			}
 		}
 
