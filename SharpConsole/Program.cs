@@ -63,14 +63,17 @@ namespace SharpConsole
 				#endif
 			}
 
-			public void Draw(Chip8VM vm)
+			public void Draw(Memory<byte> draw)
 			{
 				#if WINDOWS
-					Form.InvokeDraw(vm.State.VMEM);
+					Form.InvokeDraw(draw);
 				#else
-					
+									
 				#endif
 			}
+
+			public void Draw(Chip8VM vm) => 
+				Draw(vm.State.VMEM);
 		}
 
 		static void RunJIT(string fileName) 
@@ -128,6 +131,14 @@ namespace SharpConsole
 				RunInterpreter(args[1]);
 			else if (args[0] == "time")
 				TimeVms(args[1]);
+			#if DEBUG
+				else if (args[0] == "view") //Used to debug the screen output from CChip8
+				{
+					VmemVisualizer view = new VmemVisualizer();
+					view.Draw(File.ReadAllBytes(args[1]));
+					Console.ReadLine();
+				}
+			#endif
 			else Console.WriteLine("Unknown mode");
 		}
 
