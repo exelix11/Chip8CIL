@@ -137,9 +137,9 @@ void Chip8_Execute(Chip8State* state)
 {
 	for (int i = 0; i < TotalRAM && !state->Terminated; i++)
 	{
-		uint16_t asm = (state->RAM[state->PC] << 8) | state->RAM[state->PC + 1];
+		uint16_t opCode = (state->RAM[state->PC] << 8) | state->RAM[state->PC + 1];
 		Chip8Instruction inst;
-		assert(ParseInstruction(&inst, asm));
+		assert(ParseInstruction(&inst, opCode));
 		inst.Def->Implementation(state, &inst);
 		state->PC += 2;
 	}
@@ -148,14 +148,24 @@ void Chip8_Execute(Chip8State* state)
 	//fclose(f);
 }
 
-Chip8State vmState;
+static Chip8State vmState;
 
-#include <windows.h>
+#include <time.h>
 
-
-int main()
+int main(int argc, const char** argv)
 {
-	FILE* f = fopen("F:/test_opcode.ch8", "rb");
+	if (argc != 2)
+	{
+		printf("Pass the file as argument\n");
+		return;
+	}
+	
+	FILE* f = fopen(argv[1], "rb");
+	if (!f)
+	{
+		printf("File %s not found !\n", argv[1]);
+		return;
+	}	
 	fseek(f, 0, SEEK_END);
 	int size = ftell(f);
 	fseek(f, 0, SEEK_SET);
@@ -163,20 +173,18 @@ int main()
 	fread(rom, 1, size, f);
 	fclose(f);
 
-	LARGE_INTEGER BeginTime;
-	LARGE_INTEGER EndTime;
-	LARGE_INTEGER Freq;
-	QueryPerformanceCounter(&BeginTime);
-	for (int i = 0; i < 5000; i++)
+	clock_t start, end;	
+    start = clock();
+    for (int i = 0; i < 5000; i++)
 	{
 		Chip8_InitState(&vmState, rom, size);
 		Chip8_Execute(&vmState);
 	}
-	QueryPerformanceCounter(&EndTime);
-	QueryPerformanceFrequency(&Freq);
+	end = clock();
+    double time = ((double) (end - start)) / CLOCKS_PER_SEC;
 	
-	printf("%lfs\n", (double)((EndTime.QuadPart - BeginTime.QuadPart)) / Freq.QuadPart);
-	getc(stdin);
-
+	//Cheat to have the output line up with the C# ver, we know it won't take more than 9 seconds anyway
+	printf("00:00:0%.7lf C interpreter\n", time);
+	
 	free(rom);
 }
