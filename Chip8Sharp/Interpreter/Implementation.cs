@@ -265,51 +265,46 @@ namespace Chip8Sharp.Interpreter
 			Span<byte> sprite = state.RAM.Span.Slice(state.I, imm4);
 			Span<byte> vmem = state.VMEM.Span;
 
-			//Precaulculate X pixels masks
-			Span<int> Offsets = stackalloc int[8];
-			Span<byte> Masks = stackalloc byte[8];
-
-			int x = regx;
-			if (x + 8 >= Chip8State.DisplayW)
-				x = 0;
-
-			Offsets[0] = x / 8;
-			Masks[0] = (byte)(0x80 >> (x % 8));
-			for (int i = 1; i < 8; i++)
-			{
-				byte mask = (byte)(Masks[i - 1] >> 1);
-				Masks[i] = mask;
-				Offsets[i] = Offsets[i - 1];
-				if (mask == 0)
-				{
-					Masks[i] = 0x80;
-					Offsets[i]++;
-				}
-			}
-
 			state.Registers.VF = 0;
-			int sprIndex = 0;
-			for (int y = regy; y < regy + imm4; y++)
-			{
-				int actualY = (y >= Chip8State.DisplayH) ? (y - Chip8State.DisplayH) : y;
-				byte sprSrc = sprite[sprIndex++];
-				int YOffset = _dwblock * actualY;
 
-				for (int xs = 0; xs < 8; xs++)
+			var unset = false;
+
+			for (int i = 0; i < imm4; i++)
+			{
+				var sprSrc = sprite[i];
+
+				var y = regy + i;
+				var actualY = (y >= Chip8State.DisplayH) ? (y - Chip8State.DisplayH) : y;
+				var offset = regx + actualY * Chip8State.DisplayW;
+
+				var byteoffset = offset / 8;
+				var bitoffset = offset % 8;
+
+				var slice = vmem.Slice(byteoffset, 2);
+
+				ref var block0 = ref slice[0];
+				ref var block1 = ref slice[1];
+
+				var newblock0 = block0 ^ (sprSrc >> bitoffset);
+				var newblock1 = block1 ^ (sprSrc << (8 - bitoffset));
+
+				if (!unset)
 				{
-					if ((sprSrc & (128 >> xs)) != 0)
+					if ((block0 ^ (block0 & newblock0)) != 0
+						||
+						(block1 ^ (block1 & newblock1)) != 0)
 					{
-						ref byte vmo = ref vmem[YOffset + Offsets[xs]];
-						ref byte mask = ref Masks[xs];
-						if ((vmo & mask) != 0)
-						{
-							state.Registers.VF = 1;
-							vmo &= (byte)(~mask);
-						}
-						else vmo |= mask;
+						unset = true;
 					}
 				}
+
+				block0 = (byte)newblock0;
+				block1 = (byte)newblock1;
 			}
+
+			if (unset)
+				state.Registers.VF = 1;
+
 			state.VMEMUpdated = true;
 		}
 
