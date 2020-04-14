@@ -17,7 +17,7 @@ jobs:
       with:
         dotnet-version: 3.1.101
 
-    - name: JIT Unit tests
+    - name: Run tests
       run : dotnet test Chip8SharpJITTests/Chip8SharpJITTests.csproj
       env : 
         DOTNET_SKIP_FIRST_TIME_EXPERIENCE : 1 
@@ -26,4 +26,9 @@ jobs:
       run: |        
         cd .script
         chmod +x benchmark.sh
-        ./benchmark.sh
+        ./benchmark.sh > benchmark.txt
+        cat benchmark.txt
+    - uses: actions/upload-artifact@v2-preview
+      with:
+        name: Benchmark result
+        path: .script/benchmark.txt
