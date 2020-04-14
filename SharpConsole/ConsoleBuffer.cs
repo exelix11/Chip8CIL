@@ -12,7 +12,7 @@ namespace ConsoleGame
 		class ScreenChar
 		{
 			public char c;
-			public ConsoleColor fg, bg;
+			public ConsoleColor fg;
 
 			public void Clear()
 			{
